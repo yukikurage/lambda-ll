@@ -6,7 +6,7 @@
 
 $$
   \begin{align*}
-  t \coloneqq x &| t \sim t | \mathtt{(}t\mathtt{,}t\mathtt{)} | \mathtt{Left(}t\mathtt{)} | \mathtt{Right(}t\mathtt{)}|t\&t|\mathtt{[}t\mathtt{,}t\mathtt{]}\\
+  t \coloneqq x &| t \sim t | \mathtt{(}t\mathtt{,}t\mathtt{)} | \mathtt{Left(}t\mathtt{)} | \mathtt{Right(}t\mathtt{)}|t\And t|\mathtt{[}t\mathtt{,}t\mathtt{]}\\
   &|1|\mathtt{T}|\mathtt{F}\\
   &|\mathtt{(}x\mathtt{,}x\mathtt{)=}t\mathtt{;}t|\mathtt{case(}t\mathtt{)}\mathtt{\{Left(}x\mathtt{):}t\mathtt{,Right(}x\mathtt{):}t\mathtt{\}}\\
   &|t\mathtt{.first}|t\mathtt{.second}|\mathtt{[}x\mathtt{,}x\mathtt{]=}t\mathtt{;}t\\
@@ -19,7 +19,7 @@ $$
 **Types**
 
 $$
-  \sigma, \tau \coloneqq 1 | 0 | \top | \bot | \tau \otimes \tau | \tau \oplus \tau | \tau \& \tau | \tau ⅋ \tau
+  \sigma, \tau \coloneqq 1 | 0 | \top | \bot | \tau \otimes \tau | \tau \oplus \tau | \tau \And  \tau | \tau ⅋ \tau
 $$
 
 **Environments**
@@ -45,8 +45,8 @@ $$
 \top^{-1} &\coloneqq 0\\
 \bot^{-1} &\coloneqq 1\\
 (\sigma \otimes \tau)^{-1} &\coloneqq \sigma^{-1} ⅋ \tau^{-1}\\
-(\sigma \oplus \tau)^{-1} &\coloneqq \sigma^{-1} \& \tau^{-1}\\
-(\sigma \& \tau)^{-1} &\coloneqq \sigma^{-1} \oplus \tau^{-1}\\
+(\sigma \oplus \tau)^{-1} &\coloneqq \sigma^{-1} \And  \tau^{-1}\\
+(\sigma \And  \tau)^{-1} &\coloneqq \sigma^{-1} \oplus \tau^{-1}\\
 (\sigma ⅋ \tau)^{-1} &\coloneqq \sigma^{-1} \otimes \tau^{-1}
 \end{align*}
 $$
@@ -88,7 +88,7 @@ $$
 **with**
 
 $$
-\frac{\Phi\vdash t_1 : \tau_1 \quad \Phi\vdash t_2 : \tau_2}{\Phi \vdash t_1 \& t_2 : \tau_1 \& \tau_2}
+\frac{\Phi\vdash t_1 : \tau_1 \quad \Phi\vdash t_2 : \tau_2}{\Phi \vdash t_1 \And  t_2 : \tau_1 \And  \tau_2}
 $$
 
 **par**

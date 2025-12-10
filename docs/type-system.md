@@ -100,17 +100,17 @@ $$
 **one**
 
 $$
-  \frac{}{\vdash 1 : 1}
+  \frac{}{\vdash \mathtt{1} : 1}
 $$
 
 **top**
 
 $$
-  \frac{}{\Phi \vdash \top : \top}
+  \frac{}{\Phi \vdash \mathtt{T} : \top}
 $$
 
 **bottom**
 
 $$
-  \frac{\Phi;\bot : \bot \vdash t : \tau}{\Phi \vdash \bot : \tau}
+  \frac{\Phi;\mathtt{F} : \bot \vdash t : \tau}{\Phi \vdash t : \tau}
 $$

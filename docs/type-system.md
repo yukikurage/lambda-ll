@@ -8,7 +8,7 @@ $$
   \begin{align*}
   t \coloneqq x &| t \sim t | \mathtt{(}t\mathtt{,}t\mathtt{)} | \mathtt{Left(}t\mathtt{)} | \mathtt{Right(}t\mathtt{)}|t\And t|\mathtt{[}t\mathtt{,}t\mathtt{]}\\
   &|1|\mathtt{T}|\mathtt{F}\\
-  &|\mathtt{(}x\mathtt{,}x\mathtt{)=}t\mathtt{;}t|\mathtt{case(}t\mathtt{)}\mathtt{\{Left(}x\mathtt{):}t\mathtt{,Right(}x\mathtt{):}t\mathtt{\}}\\
+  &|\mathtt{(}x\mathtt{,}x\mathtt{)=}t\mathtt{;}t|\mathtt{case(}t\mathtt{)}\mathtt{\lbrace Left(}x\mathtt{):}t\mathtt{,Right(}x\mathtt{):}t\mathtt{\rbrace}\\
   &|t\mathtt{.first}|t\mathtt{.second}|\mathtt{[}x\mathtt{,}x\mathtt{]=}t\mathtt{;}t\\
   &|\mathtt{one}\ t\mathtt{;}t|\mathtt{bottom}\ t\mathtt{;}t|\mathtt{zero}\ t
   \end{align*}

@@ -10,7 +10,7 @@ $$
   &|1|\mathtt{T}|\mathtt{F}\\
   &|\mathtt{(}x\mathtt{,}x\mathtt{)=}t\mathtt{;}t|\mathtt{case(}t\mathtt{)}\mathtt{\{Left(}x\mathtt{):}t\mathtt{,Right(}x\mathtt{):}t\mathtt{\}}\\
   &|t\mathtt{.first}|t\mathtt{.second}|\mathtt{[}x\mathtt{,}x\mathtt{]=}t\mathtt{;}t\\
-  &|\mathtt{one}\ t\mathtt{;}t|\mathtt{false}\ t\mathtt{;}t|\mathtt{zero}\ t
+  &|\mathtt{one}\ t\mathtt{;}t|\mathtt{bottom}\ t\mathtt{;}t|\mathtt{zero}\ t
   \end{align*}
 $$
 

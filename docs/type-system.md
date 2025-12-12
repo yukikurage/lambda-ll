@@ -204,7 +204,7 @@ $$
 **tensor elimination**
 
 $$
-\frac{s;\Gamma\vdash t:\tau_1 \otimes\tau_2, \Delta \quad s';\Gamma, x : \tau_1, y : \tau_2 \vdash \Delta'}{s \cup s'; (x, y) = t; \Gamma\vdash \Delta, \Delta'}
+\frac{s;\Gamma\vdash t:\tau_1 \otimes\tau_2, \Delta \quad s';\Gamma, x : \tau_1, y : \tau_2 \vdash \Delta'}{s; (x, y) = t; s' \Gamma\vdash \Delta, \Delta'}
 $$
 
 **plus elimination**

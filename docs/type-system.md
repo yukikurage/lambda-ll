@@ -6,12 +6,29 @@
 
 $$
   \begin{align*}
-  t \coloneqq x &| t \sim t | \mathtt{(}t\mathtt{,}t\mathtt{)} | \mathtt{Left(}t\mathtt{)} | \mathtt{Right(}t\mathtt{)}|t\And t|\mathtt{[}t\mathtt{,}t\mathtt{]}\\
-  &|1|\mathtt{T}|\mathtt{F}\\
-  &|\mathtt{(}x\mathtt{,}x\mathtt{)=}t\mathtt{;}t|\mathtt{case(}t\mathtt{)}\mathtt{\lbrace Left(}x\mathtt{):}t\mathtt{,Right(}x\mathtt{):}t\mathtt{\rbrace}\\
-  &|t\mathtt{.first}|t\mathtt{.second}|\mathtt{[}x\mathtt{,}x\mathtt{]=}t\mathtt{;}t\\
-  &|\mathtt{one}\ t\mathtt{;}t|\mathtt{bottom}\ t\mathtt{;}t|\mathtt{zero}\ t
+  t \coloneqq &x | \texttt{(}t\texttt{,}t\texttt{)} | \texttt{left(}t\texttt{)} | \texttt{right(}t\texttt{)}|t\And t|\texttt{$\lbrace$}t\texttt{,}t\texttt{$\rbrace$}\\
+  &|\texttt{()}|\texttt{drop(}t\texttt{)}|\texttt{$\lbrace\rbrace$}\\&|\texttt{case(}t\texttt{)}\texttt{[left(}x\texttt{)->}t\texttt{,right(}x\texttt{)->}t\texttt{]}
+  |t\texttt{.first}|t\texttt{.second}\\
+  &|\texttt{abort(}t\texttt{)}\\
+  &|\texttt{$\lbrace$}s;t\texttt{$\rbrace$}
   \end{align*}
+$$
+
+**Statement**
+
+$$
+  \begin{align*}
+  s^1 \coloneqq & x\ \texttt{=}\ t  \\
+  &|x\ \texttt{<->}\ y | t\ \texttt{>-<}\ t \\
+  &|\texttt{(}x\texttt{,}x\texttt{)}\ \texttt{=}\ t|\texttt{$\lbrace$}x\texttt{,}x\texttt{$\rbrace$}\ \texttt{=}\ t\\
+  &|\texttt{<-}\ t|\texttt{->}\ t
+  \end{align*}
+$$
+
+**Statement Sequence**
+
+$$
+s \coloneqq s^1; s^1; \cdots; s^1
 $$
 
 ## Types & Environments
@@ -22,21 +39,29 @@ $$
   \sigma, \tau \coloneqq 1 | 0 | \top | \bot | \tau \otimes \tau | \tau \oplus \tau | \tau \And  \tau | \tau ⅋ \tau
 $$
 
-**Environments**
+**Environment**
 
 $$
-  \Gamma, \Delta \coloneqq \emptyset | \Gamma, x : \tau
+  \Gamma \coloneqq \emptyset | \Gamma, x : \tau
 $$
 
-**Hyper Environments**
+**Result**
 
 $$
-  \Psi, \Phi \coloneqq \emptyset | \Psi ; \Gamma
+  \Delta \coloneqq \emptyset | \Delta, t : \tau
 $$
 
 ## Type Judgments
 
-### Type Inversion
+**Judgement Form**
+
+$$
+s; \Gamma \vdash \Delta
+$$
+
+(we can freely permute environment $\Gamma$ and result $\Delta$)
+
+**Type Inversion**
 
 $$
 \begin{align*}
@@ -51,66 +76,178 @@ $$
 \end{align*}
 $$
 
-### Primitive Rules
+**Statement Mixing**
 
-**var**
+Actually, meta variable $s$ in type judgement represents preordered set of statements.
 
 $$
-\frac{}{x : \tau \vdash x : \tau}
+s \cup s' = \text{All statements s.t. keeping the order of statements in $s$ and $s'$}
+$$
+
+Ex.
+
+$$
+x = t; y = u; \quad  \in s
+$$
+
+$$
+z = a; w = b; \quad \in s'
+$$
+
+then...
+
+$$
+x = t; y = u; z = a; w = b;\quad  \in s \cup s'
+$$
+
+also...
+
+$$
+z = a;  x = t; w = b; y = u;\quad  \in s \cup s'
+$$
+
+### Structural Rules
+
+**variable introduction**
+
+$$
+\frac{}{;x : \tau \vdash x : \tau}
+$$
+
+**transitivity**
+
+$$
+\frac{s_1;\Gamma_1 \vdash x : \tau, \Delta_1 \quad s_2; \Gamma_2, x : \tau \vdash \Delta_2}{s_1 \cup s_2; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
+$$
+
+### Syntactic Rules
+
+**variable binding**
+
+$$
+\frac{s;\Gamma \vdash t : \tau, \Delta}{s; x = t; \Gamma \vdash x : \tau, \Delta}
+$$
+
+**scoping**
+
+$$
+\frac{s;\Gamma \vdash t : \tau}{; \Gamma \vdash \lbrace s; t \rbrace : \tau}
+$$
+
+### Primitive Rules
+
+**initialization**
+
+$$
+\frac{}{x\ \texttt{<->}\ y;\vdash x : \tau, y : \tau^{-1}}
 $$
 
 **cut**
 
 $$
-\frac{\Gamma_1 \vdash t_1 : \sigma \quad \Gamma_2 \vdash t_2 : \sigma^{-1} \quad \Phi \vdash t_3 : \tau}{\Phi;\Gamma_1, \Gamma_2 \vdash t_1 \sim t_2 \mathtt{;} t_3 : \tau}
+\frac{s_1;\Gamma_1 \vdash t_1 : \tau, \Delta_1 \quad s_2; \Gamma_2 \vdash t_2 : \tau^{-1}, \Delta_2}{s_1 \cup s_2; t_1\ \texttt{>-<}\ t_2 ; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
 $$
 
-### Composition Rules
+### Introduction Rules
 
-**tensor**
-
-$$
-\frac{\Gamma_1 \vdash t_1 : \tau_1 \quad \Gamma_2 \vdash t_2 : \tau_2}{\Gamma_1, \Gamma_2 \vdash \mathtt{(}t_1\mathtt{,}t_2\mathtt{)} : \tau_1 \otimes \tau_2}
-$$
-
-**plus** (Left)
+**tensor introduction**
 
 $$
-\frac{\Phi\vdash t : \tau_1}{\Phi \vdash \mathtt{Left(}t\mathtt{)} : \tau_1 \oplus \tau_2}
+\frac{s_1;\Gamma_1 \vdash t_1 : \tau_1, \Delta_1 \quad s_2;\Gamma_2 \vdash t_2 : \tau_2, \Delta_2}{s_1 \cup s_2; \Gamma_1, \Gamma_2 \vdash \texttt{(}t_1\texttt{,}t_2\texttt{)} : \tau_1 \otimes \tau_2, \Delta_1, \Delta_2}
 $$
 
-**plus** (Right)
+**plus introduction** (Left)
 
 $$
-\frac{\Phi\vdash t : \tau_2}{\Phi \vdash \mathtt{Right(}t\mathtt{)} : \tau_1 \oplus \tau_2}
+\frac{s ;\Gamma \vdash t : \tau_1, \Delta}{s ;\Gamma \vdash \texttt{left(}t\texttt{)} : \tau_1 \oplus \tau_2, \Delta}
 $$
 
-**with**
+**plus introduction** (Right)
 
 $$
-\frac{\Phi\vdash t_1 : \tau_1 \quad \Phi\vdash t_2 : \tau_2}{\Phi \vdash t_1 \And  t_2 : \tau_1 \And  \tau_2}
+\frac{s ;\Gamma \vdash t : \tau_2, \Delta}{s ;\Gamma \vdash \texttt{right(}t\texttt{)} : \tau_1 \oplus \tau_2, \Delta}
 $$
 
-**par**
+**with introduction**
 
 $$
-\frac{\Phi\vdash t_1 : \tau_1 \quad \Psi\vdash t_2 : \tau_2}{\Phi;\Psi \vdash \mathtt{[}t_1 \mathtt{,}t_2\mathtt{]} : \tau_1 ⅋ \tau_2}
+\frac{s; \Gamma \vdash t_1 : \tau_1, \Delta \quad s; \Gamma \vdash t_2 : \tau_2, \Delta}{s; \Gamma \vdash t_1 \And t_2 : \tau_1 \And \tau_2, \Delta}
 $$
 
-**one**
+**par introduction**
 
 $$
-  \frac{}{\vdash \mathtt{1} : 1}
+\frac{s;\Gamma \vdash t_1 : \tau_1, t_2 : \tau_2, \Delta}{s;\Gamma \vdash \lbrace t_1 \texttt{,}t_2 \rbrace : \tau_1 ⅋ \tau_2, \Delta}
 $$
 
-**top**
+**unit introduction**
 
 $$
-  \frac{}{\Phi \vdash \mathtt{T} : \top}
+\frac{}{;\vdash \texttt{()} : 1}
 $$
 
-**bottom**
+**top introduction**
 
 $$
-  \frac{\Phi;\mathtt{F} : \bot \vdash t : \tau}{\Phi \vdash t : \tau}
+\frac{s;\Gamma \vdash t : \tau, \Delta}{s;\Gamma \vdash \texttt{drop(}t\texttt{)} : \top, \Delta}
 $$
+
+**bottom introduction**
+
+$$
+\frac{s;\Gamma\vdash\Delta}{s;\Gamma\vdash \lbrace\rbrace : \bot, \Delta}
+$$
+
+### Elimination Rules
+
+**tensor elimination**
+
+$$
+\frac{s;\Gamma\vdash t:\tau_1 \otimes\tau_2, \Delta \quad s';\Gamma, x : \tau_1, y : \tau_2 \vdash \Delta'}{s \cup s'; (x, y) = t; \Gamma\vdash \Delta, \Delta'}
+$$
+
+**plus elimination**
+
+$$
+\frac{s;\Gamma\vdash t : \tau_1 \oplus \tau_2, \Delta \quad ;\Gamma', x: \tau_1 \vdash t_1 : \tau' \quad ;\Gamma', y: \tau_2 \vdash t_2 : \tau'}{s; \Gamma, \Gamma' \vdash \texttt{case(}t\texttt{)[left(}x\texttt{)->}t_1\texttt{,right(}y\texttt{)->}t_2\texttt{]} : \tau', \Delta}
+$$
+
+**with elimination** (First)
+
+$$
+\frac{s; \Gamma \vdash t : \tau_1 \And \tau_2, \Delta}{s; \Gamma \vdash \texttt{first(}t\texttt{)} : \tau_1, \Delta}
+$$
+
+**with elimination** (Second)
+
+$$
+\frac{s; \Gamma \vdash t : \tau_1 \And \tau_2, \Delta}{s; \Gamma \vdash \texttt{second(}t\texttt{)} : \tau_2, \Delta}
+$$
+
+**par elimination**
+
+$$
+\frac{s; \Gamma \vdash t : \tau_1 ⅋ \tau_2, \Delta}{s; \lbrace x, y \rbrace = t; \Gamma \vdash x : \tau_1, y : \tau_2, \Delta}
+$$
+
+**unit elimination**
+
+$$
+\frac{s_1; \Gamma_1 \vdash t_1 : 1, \Delta_1 \quad s_2; \Gamma_2 \vdash \Delta_2}{s_1 \cup s_2; \texttt{<-} t_1; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
+$$
+
+**counit elimination**
+
+$$
+\frac{s;\Gamma \vdash t : 0, \Delta}{s;\Gamma \vdash \texttt{abort(}t\texttt{)} : \tau, \Delta}
+$$
+
+**bottom elimination**
+
+$$
+\frac{s; \Gamma \vdash t : \bot, \Delta}{s; \texttt{->} t; \Gamma \vdash \Delta}
+$$
+
+### Exponential Rules
+
+**UNDER CONSTRUCTION**

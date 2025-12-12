@@ -234,7 +234,7 @@ $$
 **unit elimination**
 
 $$
-\frac{s_1; \Gamma_1 \vdash t_1 : 1, \Delta_1 \quad s_2; \Gamma_2 \vdash \Delta_2}{s_1 \cup s_2; \texttt{<-} t_1; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
+\frac{s_1; \Gamma_1 \vdash t_1 : 1, \Delta_1 \quad s_2; \Gamma_2 \vdash \Delta_2}{s_1; \texttt{<-} t_1; s_2; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
 $$
 
 **counit elimination**

@@ -7,7 +7,8 @@
 $$
   \begin{align*}
   t \coloneqq &x | \texttt{(}t\texttt{,}t\texttt{)} | \texttt{left(}t\texttt{)} | \texttt{right(}t\texttt{)}|t\And t|\texttt{$\lbrace$}t\texttt{,}t\texttt{$\rbrace$}\\
-  &|\texttt{()}|\texttt{drop(}t\texttt{)}|\texttt{$\lbrace\rbrace$}\\ &|\texttt{case(}t\texttt{)}\texttt{[left(}x\texttt{)->}t\texttt{,right(}x\texttt{)->}t\texttt{]}
+  &|\texttt{()}|\texttt{drop(}t\texttt{)}|\texttt{$\lbrace\rbrace$} \\ 
+  &|\texttt{case(}t\texttt{)}\texttt{[left(}x\texttt{)->}t\texttt{,right(}x\texttt{)->}t\texttt{]}
   |t\texttt{.first}|t\texttt{.second}\\
   &|\texttt{abort(}t\texttt{)}\\
   &|\texttt{$\lbrace$}s;t\texttt{$\rbrace$}

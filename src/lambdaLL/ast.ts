@@ -4,6 +4,8 @@ export type Term =
   | { type: "var"; name: string }
   | { type: "tensor"; elements: Term[] } // [t, ...]
   | { type: "par"; elements: Term[] } // {t, ...}
+  | { type: "lambda"; args: { name: string; type?: LLType }[]; body: Term } // (x: A, y: B) => t
+  | { type: "app"; func: Term; args: Term[] } // f(x, y)
   | { type: "block"; statements: Statement[] }; // { s; ... }
 
 export type TypeAlias = { type: "type_alias"; name: string; value: LLType };

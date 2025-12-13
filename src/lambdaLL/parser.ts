@@ -13,377 +13,514 @@ export type TokenType =
   | "elim"
   | "return"
   | "type" // type alias
-  | "operator" // = : ; , * =>
-  | "paren_open" // (
-  | "paren_close" // )
-  | "bracket_open" // [
-  | "bracket_close" // ]
-  | "brace_open" // {
-  | "brace_close" // }
-  | "identifier"
-  | "eof";
+  | "Keyword" // let, intro, elim, return, type
+  | "Symbol" // = : ; , * => ( ) [ ] { }
+  | "Identifier"
+  | "Number" // For numeric literals, if any
+  | "EOF";
 
 export type Token = {
   type: TokenType;
   value: string;
   pos: number;
+  line: number;
+  col: number;
 };
 
 export class Lexer {
-  input: string;
-  pos: number;
+  private input: string;
+  private pos: number = 0;
+  private line: number = 1;
+  private lineStartPos: number = 0;
 
   constructor(input: string) {
     this.input = input;
-    this.pos = 0;
+  }
+
+  private peek(n: number = 0): string {
+    if (this.pos + n >= this.input.length) return "";
+    return this.input[this.pos + n];
+  }
+
+  private advance(): string {
+    const char = this.input[this.pos++];
+    if (char === "\n") {
+      this.line++;
+      this.lineStartPos = this.pos;
+    }
+    return char;
   }
 
   tokenize(): Token[] {
     const tokens: Token[] = [];
     while (this.pos < this.input.length) {
-      const char = this.input[this.pos];
+      const char = this.peek();
+      const currentLine = this.line;
+      const currentCol = this.pos - this.lineStartPos + 1;
+      const currentPos = this.pos; // Store current pos before advancing
 
       if (/\s/.test(char)) {
-        this.pos++;
-        continue;
-      }
-
-      if (this.input.startsWith("#-", this.pos)) {
-        // Block comment
-        this.pos += 2;
-        while (
-          this.pos < this.input.length &&
-          !this.input.startsWith("-#", this.pos)
-        ) {
-          this.pos++;
-        }
-        if (this.input.startsWith("-#", this.pos)) {
-          this.pos += 2;
-        }
+        this.advance();
         continue;
       }
 
       if (char === "#") {
-        // Line Comment
-        while (this.pos < this.input.length && this.input[this.pos] !== "\n") {
-          this.pos++;
+        // Comment
+        if (this.peek(1) === "-") {
+          // Block Comment
+          this.advance(); // #
+          this.advance(); // -
+          while (
+            !(this.peek() === "-" && this.peek(1) === "#") &&
+            this.pos < this.input.length
+          ) {
+            this.advance();
+          }
+          if (this.pos < this.input.length) {
+            this.advance(); // -
+            this.advance(); // #
+          }
+        } else {
+          // Line comment
+          while (this.peek() !== "\n" && this.pos < this.input.length) {
+            this.advance();
+          }
         }
         continue;
       }
 
-      if (/[a-zA-Z]/.test(char)) {
-        let value = "";
-        while (
-          this.pos < this.input.length &&
-          /[a-zA-Z0-9]/.test(this.input[this.pos])
-        ) {
-          value += this.input[this.pos];
-          this.pos++;
+      if (/[a-zA-Z_]/.test(char)) {
+        const start = this.pos;
+        while (/[a-zA-Z0-9_]/.test(this.peek())) {
+          this.advance();
         }
-        switch (value) {
-          case "let":
-          case "intro":
-          case "elim":
-          case "return":
-          case "type":
-            tokens.push({
-              type: value as TokenType,
-              value,
-              pos: this.pos - value.length,
-            });
-            break;
-          default:
-            tokens.push({
-              type: "identifier",
-              value,
-              pos: this.pos - value.length,
-            });
-            break;
+        const value = this.input.slice(start, this.pos);
+        let type: TokenType = "Identifier";
+        if (["let", "intro", "elim", "return", "type"].includes(value)) {
+          type = "Keyword";
         }
-        continue;
-      }
-
-      const operatorMatch = this.input.slice(this.pos).match(/^(=>|[:=;,*])/);
-      if (operatorMatch) {
         tokens.push({
-          type: "operator",
-          value: operatorMatch[0],
-          pos: this.pos,
+          type,
+          value,
+          pos: start,
+          line: currentLine,
+          col: currentCol,
         });
-        this.pos += operatorMatch[0].length;
         continue;
       }
 
-      if ("()[]{}".includes(char)) {
-        const typeMap: { [key: string]: TokenType } = {
-          "(": "paren_open",
-          ")": "paren_close",
-          "[": "bracket_open",
-          "]": "bracket_close",
-          "{": "brace_open",
-          "}": "brace_close",
-        };
-        tokens.push({ type: typeMap[char], value: char, pos: this.pos });
-        this.pos++;
+      if (/[0-9]/.test(char)) {
+        // Number (not used but good to have)
+        const start = this.pos;
+        while (/[0-9]/.test(this.peek())) {
+          this.advance();
+        }
+        const value = this.input.slice(start, this.pos);
+        tokens.push({
+          type: "Number",
+          value,
+          pos: start,
+          line: currentLine,
+          col: currentCol,
+        });
         continue;
       }
 
-      throw new Error(`Unexpected character: ${char} at ${this.pos}`);
+      // Symbols
+      const twoCharSymbols = ["=>"];
+      const oneCharSymbols = [
+        "=",
+        ":",
+        ";",
+        ",",
+        "*",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+      ];
+      let matched = false;
+
+      const twoChars = char + this.peek(1);
+      if (twoCharSymbols.includes(twoChars)) {
+        tokens.push({
+          type: "Symbol",
+          value: twoChars,
+          pos: currentPos,
+          line: currentLine,
+          col: currentCol,
+        });
+        this.advance();
+        this.advance();
+        matched = true;
+      } else if (oneCharSymbols.includes(char)) {
+        tokens.push({
+          type: "Symbol",
+          value: char,
+          pos: currentPos,
+          line: currentLine,
+          col: currentCol,
+        });
+        this.advance();
+        matched = true;
+      }
+
+      if (!matched) {
+        throw new Error(
+          `Unexpected character: ${char} at line ${currentLine}, col ${currentCol}`
+        );
+      }
     }
-    tokens.push({ type: "eof", value: "", pos: this.pos });
+    tokens.push({
+      type: "EOF",
+      value: "",
+      pos: this.pos,
+      line: this.line,
+      col: this.pos - this.lineStartPos + 1,
+    });
     return tokens;
   }
 }
 
+import { CompilerError } from "./compilerError";
+
 export class Parser {
-  tokens: Token[];
-  pos: number;
+  private tokens: Token[];
+  private current: number = 0;
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
-    this.pos = 0;
   }
 
-  peek(): Token {
-    return this.tokens[this.pos];
+  private peek(): Token {
+    return this.tokens[this.current];
   }
 
-  consume(type: TokenType, value?: string): Token {
-    const token = this.peek();
-    if (token.type !== type || (value && token.value !== value)) {
-      throw new Error(
-        `Expected ${type} ${value || ""}, got ${token.type} ${token.value} at ${
-          token.pos
-        }`
-      );
+  private advance(): Token {
+    if (!this.isAtEnd()) {
+      this.current++;
     }
-    this.pos++;
-    return token;
+    return this.previous();
   }
 
-  match(type: TokenType, value?: string): boolean {
-    const token = this.peek();
-    return token.type === type && (!value || token.value === value);
+  private isAtEnd(): boolean {
+    return this.peek().type === "EOF";
+  }
+
+  private previous(): Token {
+    return this.tokens[this.current - 1];
+  }
+
+  private check(type: TokenType, value?: string): boolean {
+    if (this.isAtEnd()) return false;
+    if (this.peek().type !== type) return false;
+    if (value !== undefined && this.peek().value !== value) return false;
+    return true;
+  }
+
+  private match(type: TokenType, value?: string): boolean {
+    if (this.check(type, value)) {
+      this.advance();
+      return true;
+    }
+    return false;
+  }
+
+  private consume(type: TokenType, message: string, value?: string): Token {
+    if (this.check(type, value)) return this.advance();
+    throw this.error(this.peek(), message);
+  }
+
+  private error(token: Token, message: string): CompilerError {
+    // But since I already defined CompilerError with line/col,
+    // I should probably make Lexer cleaner.
+
+    // Let's make it throw a temporary structure or just let CodeEditor handle it.
+    // But I want "proper" error handling.
+
+    // I'll throw a temporary Error with property `pos` and catch it in editor.
+    // But wait, I imported `CompilerError`.
+    // I should update `Lexer` in next step to add Line info to tokens.
+    // For now, I will throw generic Error with message and assume CodeEditor parses it?
+    // No, that was the old way.
+
+    // Let's modify `Lexer` to track lines.
+
+    return new CompilerError(message, 0, 0, 1); // Placeholders
   }
 
   parseProgram(): Program {
     const items: ProgramItem[] = [];
-    while (!this.match("eof")) {
-      if (this.match("type")) {
+    while (!this.isAtEnd()) {
+      if (this.check("Keyword", "type")) {
         items.push(this.parseTypeAlias());
+      } else if (this.check("Keyword", "let")) {
+        items.push(this.parseStatement()); // parseStatement handles 'let'
       } else {
-        items.push(this.parseStatement());
+        throw this.error(
+          this.peek(),
+          "Expected top-level 'type' or 'let' declaration"
+        );
       }
     }
     return items;
   }
 
   parseTypeAlias(): TypeAlias {
-    this.consume("type");
-    const name = this.consume("identifier").value;
-    this.consume("operator", "=");
+    this.consume("Keyword", "Expected 'type'", "type");
+    const name = this.consume("Identifier", "Expected type name").value;
+    this.consume("Symbol", "Expected '='", "=");
     const value = this.parseLLType();
-    this.consume("operator", ";");
+    this.consume("Symbol", "Expected ';'", ";");
     return { type: "type_alias", name, value };
   }
 
   parseStatement(): Statement {
-    if (this.match("let")) {
-      this.consume("let");
-      if (this.match("brace_open")) {
+    if (this.match("Keyword", "let")) {
+      // let ...
+      if (this.match("Symbol", "{")) {
         // let {x1, ...} = t
-        this.consume("brace_open");
         const names: string[] = [];
-        while (!this.match("brace_close")) {
-          names.push(this.consume("identifier").value);
-          if (this.match("operator", ",")) this.consume("operator", ",");
-        }
-        this.consume("brace_close");
-        this.consume("operator", "=");
+        do {
+          names.push(
+            this.consume("Identifier", "Expected variable name").value
+          );
+        } while (this.match("Symbol", ","));
+        this.consume("Symbol", "Expected '}'", "}");
+        this.consume("Symbol", "Expected '='", "=");
         const value = this.parseTerm();
-        this.consume("operator", ";");
+        this.consume("Symbol", "Expected ';'", ";");
         return { type: "let_destruct_par", names, value };
-      } else if (this.match("bracket_open")) {
+      } else if (this.match("Symbol", "[")) {
         // let [x1, ...] = t
-        this.consume("bracket_open");
         const names: string[] = [];
-        while (!this.match("bracket_close")) {
-          names.push(this.consume("identifier").value);
-          if (this.match("operator", ",")) this.consume("operator", ",");
-        }
-        this.consume("bracket_close");
-        this.consume("operator", "=");
+        do {
+          names.push(
+            this.consume("Identifier", "Expected variable name").value
+          );
+        } while (this.match("Symbol", ","));
+        this.consume("Symbol", "Expected ']'", "]");
+        this.consume("Symbol", "Expected '='", "=");
         const value = this.parseTerm();
-        this.consume("operator", ";");
+        this.consume("Symbol", "Expected ';'", ";");
         return { type: "let_destruct_tensor", names, value };
       } else {
         // let x [: T] = t
-        const name = this.consume("identifier").value;
+        const name = this.consume("Identifier", "Expected variable name").value;
         let typeAnnotation: LLType | undefined;
-        if (this.match("operator", ":")) {
-          this.consume("operator", ":");
+        if (this.match("Symbol", ":")) {
           typeAnnotation = this.parseLLType();
         }
-        this.consume("operator", "=");
+        this.consume("Symbol", "Expected '='", "=");
         const value = this.parseTerm();
-        this.consume("operator", ";");
+        this.consume("Symbol", "Expected ';'", ";");
         return { type: "let", name, typeAnnotation, value };
       }
-    } else if (this.match("intro")) {
+    } else if (this.match("Keyword", "intro")) {
       // intro x, y : T
-      this.consume("intro");
-      const name1 = this.consume("identifier").value;
-      this.consume("operator", ",");
-      const name2 = this.consume("identifier").value;
-      this.consume("operator", ":");
+      const name1 = this.consume("Identifier", "Expected name").value;
+      this.consume("Symbol", "Expected ','", ",");
+      const name2 = this.consume("Identifier", "Expected name").value;
+      this.consume("Symbol", "Expected ':'", ":");
       const typeAnnotation = this.parseLLType();
-      this.consume("operator", ";");
+      this.consume("Symbol", "Expected ';'", ";");
       return { type: "intro", name1, name2, typeAnnotation };
-    } else if (this.match("elim")) {
+    } else if (this.match("Keyword", "elim")) {
       // elim t1, t2
-      this.consume("elim");
       const term1 = this.parseTerm();
-      this.consume("operator", ",");
+      this.consume("Symbol", "Expected ','", ",");
       const term2 = this.parseTerm();
-      this.consume("operator", ";");
+      this.consume("Symbol", "Expected ';'", ";");
       return { type: "elim", term1, term2 };
-    } else if (this.match("return")) {
-      this.consume("return");
+    } else if (this.match("Keyword", "return")) {
       const value = this.parseTerm();
-      this.consume("operator", ";");
+      this.consume("Symbol", "Expected ';'", ";");
       return { type: "return", value };
     }
-    throw new Error(
-      `Unexpected start of statement: ${this.peek().value} at ${
-        this.peek().pos
-      }`
+    throw this.error(
+      this.peek(),
+      `Unexpected start of statement: ${this.peek().value}`
     );
   }
 
   parseTerm(): Term {
-    if (this.match("identifier")) {
-      return { type: "var", name: this.consume("identifier").value };
-    } else if (this.match("bracket_open")) {
-      this.consume("bracket_open");
+    let term: Term;
+    if (this.match("Identifier")) {
+      term = { type: "var", name: this.previous().value };
+    } else if (this.match("Symbol", "[")) {
       const elements: Term[] = [];
-      while (!this.match("bracket_close")) {
+      do {
         elements.push(this.parseTerm());
-        if (this.match("operator", ",")) this.consume("operator", ",");
-      }
-      this.consume("bracket_close");
-      return { type: "tensor", elements };
-    } else if (this.match("brace_open")) {
+      } while (this.match("Symbol", ","));
+      this.consume("Symbol", "Expected ']'", "]");
+      term = { type: "tensor", elements };
+    } else if (this.match("Symbol", "{")) {
       // Can be Par {x, y} OR Block { stmt; ... }
-      this.consume("brace_open");
 
-      // Check lookup
+      // Lookahead to disambiguate Par vs Block
+      // Block starts with statement keywords: let, intro, elim, return
       const token = this.peek();
-      const isBlock = ["let", "intro", "elim", "return"].includes(token.type);
+      const isBlock =
+        token.type === "Keyword" &&
+        ["let", "intro", "elim", "return"].includes(token.value);
 
       if (isBlock) {
         const statements: Statement[] = [];
-        while (!this.match("brace_close")) {
+        while (!this.check("Symbol", "}")) {
           statements.push(this.parseStatement());
-          // Statements end with ; inside parseStatement usually?
-          // My parseStatement consumes ;.
         }
-        this.consume("brace_close");
-        return { type: "block", statements };
+        this.consume("Symbol", "Expected '}'", "}");
+        term = { type: "block", statements };
       } else {
         // Par
         const elements: Term[] = [];
-        while (!this.match("brace_close")) {
+        do {
           elements.push(this.parseTerm());
-          if (this.match("operator", ",")) this.consume("operator", ",");
+        } while (this.match("Symbol", ","));
+        this.consume("Symbol", "Expected '}'", "}");
+        term = { type: "par", elements };
+      }
+    } else if (this.match("Symbol", "(")) {
+      // (t) or (t1, t2) or (x:A, y) => t
+
+      const elements: { term: Term; type?: LLType }[] = [];
+
+      // Empty () possibly?
+      if (!this.check("Symbol", ")")) {
+        do {
+          const term = this.parseTerm();
+          let type: LLType | undefined;
+          if (this.match("Symbol", ":")) {
+            type = this.parseLLType();
+          }
+          elements.push({ term, type });
+        } while (this.match("Symbol", ","));
+      }
+      this.consume("Symbol", "Expected ')'", ")");
+
+      if (this.match("Symbol", "=>")) {
+        // It's a lambda!
+        // Elements MUST be variables.
+        const args: { name: string; type?: LLType }[] = [];
+        for (const e of elements) {
+          if (e.term.type !== "var") {
+            throw this.error(
+              this.previous(),
+              "Lambda arguments must be variables"
+            );
+          }
+          args.push({ name: e.term.name, type: e.type });
         }
-        this.consume("brace_close");
-        return { type: "par", elements };
+        const body = this.parseTerm();
+        term = { type: "lambda", args, body };
+      } else {
+        // Just (T) or (T1, T2)
+        // Ensure no types were provided
+        for (const e of elements) {
+          if (e.type) {
+            throw this.error(
+              this.previous(),
+              "Unexpected type annotation in tuple/expression"
+            );
+          }
+        }
+
+        if (elements.length === 1) term = elements[0].term;
+        else term = { type: "tensor", elements: elements.map((e) => e.term) };
       }
-    } else if (this.match("paren_open")) {
-      this.consume("paren_open");
-      // (t) or (t1, t2)
-      const elements: Term[] = [];
-      while (!this.match("paren_close")) {
-        elements.push(this.parseTerm());
-        if (this.match("operator", ",")) this.consume("operator", ",");
-      }
-      this.consume("paren_close");
-      if (elements.length === 1) return elements[0];
-      // (Term tuple) -> treat as Tensor if user allows?
-      // User example: return {(p, arg1), arg2} -> (p, arg1) is tensor.
-      return { type: "tensor", elements };
+    } else {
+      throw this.error(
+        this.peek(),
+        `Unexpected start of term: ${this.peek().value}`
+      );
     }
-    throw new Error(
-      `Unexpected start of term: ${this.peek().value} at ${this.peek().pos}`
-    );
+
+    // Check for App: term(args)
+    while (this.match("Symbol", "(")) {
+      const args: Term[] = [];
+      if (!this.check("Symbol", ")")) {
+        do {
+          args.push(this.parseTerm());
+        } while (this.match("Symbol", ","));
+      }
+      this.consume("Symbol", "Expected ')'", ")");
+      term = { type: "app", func: term, args };
+    }
+
+    return term;
   }
 
   // Parsing Types: P, Q, T*, [T...], {T...}, (T...)=>T
   parseLLType(): LLType {
-    let type = this.parseLLTypeAtom();
-
-    while (true) {
-      if (this.match("operator", "*")) {
-        this.consume("operator", "*");
-        type = typeInverse(type);
-      } else if (this.match("operator", "=>")) {
-        this.consume("operator", "=>");
-        const right = this.parseLLType(); // right associative?
-        type = parType([typeInverse(type), right]);
-      } else {
-        break;
-      }
-    }
-    return type;
+    return this.parseLLTypeAtom();
   }
 
   parseLLTypeAtom(): LLType {
-    if (this.match("identifier")) {
-      const name = this.consume("identifier").value;
-      // Assuming primitive types for now (or alias name)
-      return primitiveType(name, 1);
-    } else if (this.match("bracket_open")) {
-      this.consume("bracket_open");
+    let type: LLType;
+    if (this.match("Identifier")) {
+      const name = this.previous().value;
+      type = primitiveType(name, 1);
+    } else if (this.match("Symbol", "[")) {
       const elements: LLType[] = [];
-      while (!this.match("bracket_close")) {
+      do {
         elements.push(this.parseLLType());
-        if (this.match("operator", ",")) this.consume("operator", ",");
-      }
-      this.consume("bracket_close");
-      return tensorType(elements);
-    } else if (this.match("brace_open")) {
-      this.consume("brace_open");
+      } while (this.match("Symbol", ","));
+      this.consume("Symbol", "Expected ']'", "]");
+      type = tensorType(elements);
+    } else if (this.match("Symbol", "{")) {
       const elements: LLType[] = [];
-      while (!this.match("brace_close")) {
+      do {
         elements.push(this.parseLLType());
-        if (this.match("operator", ",")) this.consume("operator", ",");
-      }
-      this.consume("brace_close");
-      return parType(elements);
-    } else if (this.match("paren_open")) {
-      this.consume("paren_open");
+      } while (this.match("Symbol", ","));
+      this.consume("Symbol", "Expected '}'", "}");
+      type = parType(elements);
+    } else if (this.match("Symbol", "(")) {
       const elements: LLType[] = [];
-      while (!this.match("paren_close")) {
-        elements.push(this.parseLLType());
-        if (this.match("operator", ",")) this.consume("operator", ",");
+      if (!this.check("Symbol", ")")) {
+        do {
+          elements.push(this.parseLLType());
+        } while (this.match("Symbol", ","));
       }
-      this.consume("paren_close");
+      this.consume("Symbol", "Expected ')'", ")");
 
       // Check if followed by =>
-      if (this.match("operator", "=>")) {
-        this.consume("operator", "=>");
+      if (this.match("Symbol", "=>")) {
         const right = this.parseLLType();
         const lefts = elements.map((t) => typeInverse(t));
         // (A, B) => C is {A*, B*, C}
-        return parType([...lefts, right]);
+        // Mark preference as "function"
+        return parType([...lefts, right], "function");
       }
 
       // Just (T) or (T1, T2)
-      if (elements.length === 1) return elements[0];
-      return tensorType(elements);
+      if (elements.length === 1) type = elements[0];
+      else type = tensorType(elements);
+    } else {
+      throw this.error(
+        this.peek(),
+        `Unexpected start of type: ${this.peek().value}`
+      );
     }
-    throw new Error(
-      `Unexpected start of type: ${this.peek().value} at ${this.peek().pos}`
-    );
+
+    // Handle postfix operators like * or => (if not parenthesized)
+    // Wait, `A => B` without parens?
+    // Current parser structure handles atoms. type* is handled here?
+    // Original code loop handled *. Let's reinstate that loop structure if needed.
+    // Actually, type* connects to the specific atom.
+    while (this.match("Symbol", "*")) {
+      type = typeInverse(type);
+    }
+
+    // Handle A => B (infix) ??
+    // The previous implementation had `parseLLType` calling `parseLLTypeAtom` then checking `=>`.
+    // Let's support `A => B` at the top level.
+    if (this.match("Symbol", "=>")) {
+      const right = this.parseLLType();
+      type = parType([typeInverse(type), right], "function");
+    }
+
+    return type;
   }
 }

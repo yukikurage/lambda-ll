@@ -1,17 +1,18 @@
-import { Statement, Term, Program, ProgramItem, TypeAlias } from "./ast";
+import { Statement, Term, Program } from "./ast";
 import {
   ContextId,
   ContextTree,
   addBranchNode,
   addLeafNode,
+  addRootNode,
   connectNodes,
   destructNode,
-  getBranchNode,
   getLeafNode,
+  getNode,
   normalize,
   removeNode,
 } from "./contextTree";
-import { LLType, typeInverse, tensorType, parType } from "./lltype";
+import { LLType, typeInverse, tensorType, parType, formatType } from "./lltype";
 
 export type Variables = Map<string, ContextId>; // variable name -> leaf node id
 export type TypeEnv = Map<string, LLType>; // type alias -> LLType
@@ -23,8 +24,6 @@ function resolveType(t: LLType, env: TypeEnv): LLType {
       // If alias is T = [A]. T* = [A]*.
       // Logic: standard LL alias is usually for the positive type.
       // If t is T*. `resolve(T)` is `[A]`. `T*` is `[A]*`.
-      const resolved = env.get(t.name)!;
-      // If t.spin is -1, invert resolved.
       // How to strict parsing?
       // `primitiveType` has `spin`.
       // If we aliased `MP = ...`. `MP` is primitive "MP".
@@ -32,6 +31,7 @@ function resolveType(t: LLType, env: TypeEnv): LLType {
       // If usage `MP*`. `spin` is -1. result is `resolved*`.
       // We need `typeInverse` to handle complex types properly if `resolved` covers it.
       // Yes `typeInverse` does that.
+      const resolved = env.get(t.name)!;
       if (t.spin === -1) {
         return typeInverse(resolved);
       }
@@ -71,6 +71,41 @@ function deepCopyVariables(vars: Variables): Variables {
   return new Map(vars);
 }
 
+function isDescendant(
+  tree: ContextTree,
+  childId: ContextId,
+  ancestorId: ContextId
+): boolean {
+  if (childId === ancestorId) return true;
+  let curr = tree.structure.get(childId);
+  while (curr && curr.parent !== undefined) {
+    if (curr.parent === ancestorId) return true;
+    curr = tree.structure.get(curr.parent);
+  }
+  return false;
+}
+
+function propagatePreference(target: LLType, source: LLType) {
+  if (target.type !== source.type) return;
+
+  if (target.type === "par" && source.type === "par") {
+    if (source.preference) target.preference = source.preference;
+    if (target.elements.length === source.elements.length) {
+      target.elements.forEach((e, i) =>
+        propagatePreference(e, source.elements[i])
+      );
+    }
+  }
+  if (target.type === "tensor" && source.type === "tensor") {
+    if (source.preference) target.preference = source.preference;
+    if (target.elements.length === source.elements.length) {
+      target.elements.forEach((e, i) =>
+        propagatePreference(e, source.elements[i])
+      );
+    }
+  }
+}
+
 export function check_term(
   term: Term,
   tree: ContextTree,
@@ -104,100 +139,37 @@ export function check_term(
       return connectNodes(tree, ids, "par");
     }
     case "block": {
-      // { stmt; ... return t; }
-      // Scope logic:
-      // We reuse `tree` and `vars`.
-      // We iterate statements.
-      // We expect last statement to be `return`.
-      // Or simple iteration.
-      // `vars` are scoped.
-      // We need to ensure that local vars are consumed.
-      // Logic:
-      // `contextTree` is modified in place.
-      // If we introduce vars, they are adding Leaves.
-      // If we don't consume them, they remain as Leaves.
-      // `connectNodes` or `normalize` at end of block should result in SINGLE node?
-      // `return t` logic: `check_term(t)`. `normalize`.
-      // If there are other nodes left in the tree?
-      // Wait, `check_term(block)` returns a ContextId.
-      // That ContextId corresponds to the resulting term.
-      // If the block execution left garbage nodes in the tree (unused vars),
-      // `tree` will contain them.
-      // But `ContextTree` doesn't strictly enforce "clean tree" at every step?
-      // The prompt says: "assume that no node except for t and outer variables is left".
-      // This implies verification.
-      // So we should verify: `tree.structure` contains only descendants of `returnedId` + outer vars.
-      // But outer vars are also in the tree.
-      // So: Any node reachable from `vars` (passed in) is allowed.
-      // Any node reachable from `returnedId` is allowed.
-      // Anything else is garbage (unused local var).
-      // Since LL requires using everything once:
-      // If we introduced a local var, it MUST be used.
-      // If used, it is connected to something.
-      // Eventually everything connected to `returnedId`.
-      // So `returnedId` should be the Root?
-      // Or if we are inside a larger construct?
-      // `check_term` is called recursively.
-      // Example: `[ { let x=... return x }, y ]`
-      // Inner block returns `x`. Tree has `y` too.
-      // Inner block shouldn't touch `y`.
-      // Inner block introduces `local`. They must be consumed into `x`.
-      // So: `tree` has `y`, `x`, `garbage`.
-      // We want to ensure no `garbage`.
-      // How? count nodes? Or track usage?
-
       let currentVars = deepCopyVariables(vars); // Scoped vars
-      const initialVarCount = vars.size;
 
       // Execute statements
       for (const stmt of term.statements) {
-        currentVars = check_statement(stmt, tree, currentVars, types);
-      }
-
-      // Find the return value?
-      // My Logic: `return` statement in `check_statement` returns `vars`.
-      // But `return` statement has `value`.
-      // We need to capture the `return`ed ID.
-      // `check_statement` should probably return `ContextId | Variables`?
-      // Or we handle `return` differently.
-      // AST says Block has `Statement[]`.
-      // One of them is `return`.
-      // We can scan for `return` or ensure it's last.
-      // Parser doesn't enforce `return` is last.
-      // But execution flow does.
-      // Let's modify `check_statement` to handle return signal?
-
-      // Actually simpler: `check_block` logic iterates statements.
-      // If statement is `return`, we evaluate term and return ID.
-      // If statement is `let` etc, we update vars.
-
-      // I'll inline statement loop here with special handling for return.
-
-      for (const stmt of term.statements) {
         if (stmt.type === "return") {
           const retId = check_term(stmt.value, tree, currentVars, types);
-
-          // Verify linearity/garbage collection?
-          // Just calling `normalize(tree)` is standard behavior.
           normalize(tree);
 
-          // Strict check: All `currentVars` that are NOT in `vars` (outer) must be consumed?
-          // `consumed` means they are not accessible?
-          // If they are in `currentVars`, they point to a `ConceptId`.
-          // If that `ConceptId` is still in `tree`, it might be part of `retId` structure.
-          // If it is NOT part of `retId` structure, it is unused.
-          // UNLESS it is an outer var.
-          // So: For every `k, v` in `currentVars`.
-          // If `!vars.has(k)` (it is local):
-          //   Check if `v` is part of `retId` tree?
-          //   How to check? `getPathToRoot(v)` passes through `retId`.
-          //   Wait, `retId` is just a node.
-          //   If `retId` is the valid result, it is a sub-tree.
-          //   Descendants of `retId` are parts of it.
-          //   Does `ContextTree` have parent pointers? Yes.
-          //   So check if `v` is descendant of `retId`.
-          //   OR `v` IS `retId`.
-          //   Helper: `isDescendant(tree, child, ancestor)`.
+          // Linearity Check: Ensure all local variables are consumed (must be part of retId tree)
+          for (const [name, id] of currentVars.entries()) {
+            if (!vars.has(name)) {
+              // It is a local variable
+              if (tree.structure.has(id)) {
+                // If it exists in tree
+                if (!isDescendant(tree, id, retId)) {
+                  throw new Error(
+                    `Linear variable '${name}' is not consumed (not part of return value).`
+                  );
+                }
+              }
+              // If not in tree (consumed by elim/destruct?), that's fine?
+              // Wait, elim removes the tensor node. The variables were connected to it.
+              // connectNodes(tensor) removed original leaves?
+              // Tensor logic `connectNode` uses `mergeBranch`. It does NOT remove original leaves.
+              // Par logic `connectNode` uses `removeNode`.
+              // So for Tensor vars, they SHOULD be in tree.
+              // If they are missing, it's weird?
+              // But `if (tree.structure.has(id))` safety check is fine.
+            }
+          }
+
           return retId;
         } else {
           currentVars = check_statement(stmt, tree, currentVars, types);
@@ -205,24 +177,92 @@ export function check_term(
       }
       throw new Error("Block must end with return");
     }
-  }
-}
+    case "lambda": {
+      // (args) => body
+      // Desugar to: block { intro _arg1, arg1 : Type; ... return {_arg1, ..., body} }
+      const statements: Statement[] = [];
+      const returnElements: Term[] = [];
 
-function isDescendant(
-  tree: ContextTree,
-  childId: ContextId,
-  ancestorId: ContextId
-): boolean {
-  if (childId === ancestorId) return true;
-  const node = getLeafNode(tree, childId); // Actually getNode
-  // Wait getNode signature
-  // Need to traverse up.
-  let curr = tree.structure.get(childId);
-  while (curr && curr.parent !== undefined) {
-    if (curr.parent === ancestorId) return true;
-    curr = tree.structure.get(curr.parent);
+      for (const arg of term.args) {
+        if (!arg.type) {
+          throw new Error("Lambda argument types are required");
+        }
+        const internalName = `_${arg.name}_neg`;
+        // intro _x, x : T
+        statements.push({
+          type: "intro",
+          name1: internalName,
+          name2: arg.name,
+          typeAnnotation: arg.type,
+        });
+        returnElements.push({ type: "var", name: internalName });
+      }
+
+      returnElements.push(term.body);
+
+      const blockTerm: Term = {
+        type: "block",
+        statements: [
+          ...statements,
+          {
+            type: "return",
+            value: { type: "par", elements: returnElements },
+          },
+        ],
+      };
+
+      const resultId = check_term(blockTerm, tree, vars, types);
+
+      // Tag with preference
+      const node = getLeafNode(tree, resultId);
+      if (node.type.type === "par") {
+        node.type.preference = "function";
+      }
+
+      return resultId;
+    }
+    case "app": {
+      // func(args)
+      // Desugar to:
+      // block {
+      //   let {_arg1, ..., _ret} = func;
+      //   elim _arg1, arg1;
+      //   ...
+      //   return _ret;
+      // }
+
+      const statements: Statement[] = [];
+      const retName = "_ret";
+      const argNames: string[] = [];
+
+      term.args.forEach((_, i) => argNames.push(`_arg_${i}`));
+
+      // let { ... } = func
+      statements.push({
+        type: "let_destruct_par",
+        names: [...argNames, retName],
+        value: term.func,
+      });
+
+      // elim
+      term.args.forEach((arg, i) => {
+        statements.push({
+          type: "elim",
+          term1: { type: "var", name: argNames[i] },
+          term2: arg,
+        });
+      });
+
+      // return
+      statements.push({
+        type: "return",
+        value: { type: "var", name: retName },
+      });
+
+      const blockTerm: Term = { type: "block", statements };
+      return check_term(blockTerm, tree, vars, types);
+    }
   }
-  return false;
 }
 
 export function check_statement(
@@ -238,8 +278,16 @@ export function check_statement(
 
       if (stmt.typeAnnotation) {
         if (!isTypeEqual(tNode.type, stmt.typeAnnotation, types)) {
-          // Warn?
+          throw new Error(
+            `Type mismatch for let '${stmt.name}': expected ${formatType(
+              stmt.typeAnnotation
+            )}, got ${formatType(tNode.type)}`
+          );
         }
+
+        // Propagate preferences recursively
+        const resolved = resolveType(stmt.typeAnnotation, types);
+        propagatePreference(tNode.type, resolved);
       }
 
       const newVars = deepCopyVariables(vars);
@@ -275,9 +323,15 @@ export function check_statement(
       return newVars;
     }
     case "intro": {
-      const root = getBranchNode(tree, tree.root);
-      if (root.branchType !== "tensor") {
-        throw new Error("Root must be Tensor to use intro");
+      const root = getNode(tree, tree.root);
+      // Intro requires Root to be a Tensor Branch.
+      // If it is a Leaf (e.g. previous result) or Par, wrap it in a Tensor.
+      if (
+        root.nodeType === "leaf" ||
+        (root.nodeType === "branch" && root.branchType !== "tensor")
+      ) {
+        addRootNode(tree, "tensor");
+        // tree.root is now updated
       }
 
       const type = resolveType(stmt.typeAnnotation, types);
@@ -320,7 +374,7 @@ export function check_statement(
   }
 }
 
-export function check_program(program: Program, tree: ContextTree): void {
+export function check_program(program: Program, tree: ContextTree): Variables {
   let vars: Variables = new Map();
   const types: TypeEnv = new Map();
 
@@ -329,10 +383,8 @@ export function check_program(program: Program, tree: ContextTree): void {
       types.set(item.name, item.value);
     } else {
       // Statement
-      // Top level statements?
-      // "Statement: let, intro, elim, return".
-      // `basic.ll` has `let mp1 ...` at top level.
       vars = check_statement(item as Statement, tree, vars, types);
     }
   }
+  return vars;
 }

@@ -146,7 +146,9 @@ export function getParentNode(
   id: ContextId
 ): ContextBranchNode | undefined {
   const node = getNode(tree, id);
-  return node.parent ? getBranchNode(tree, node.parent) : undefined;
+  return node.parent !== undefined
+    ? getBranchNode(tree, node.parent)
+    : undefined;
 }
 
 export function getNewId(tree: ContextTree): ContextId {
@@ -338,19 +340,20 @@ export function normalize(tree: ContextTree) {
       if (!node) continue;
 
       // 1. Contraction: Remove nodes with 0 children
-      if (node.nodeType === "branch" && node.children.length === 0) {
-        if (node.parent !== undefined) {
-          const parent = getBranchNode(tree, node.parent);
-          parent.children = parent.children.filter((c) => c !== id);
-        } else {
-          // Removes root? Allowed if tree is empty?
-          // For now, let's allow removing empty root if it's not the only node?
-          // If root is empty, tree is empty.
-        }
-        tree.structure.delete(id);
-        changed = true;
-        continue;
-      }
+      // if (node.nodeType === "branch" && node.children.length === 0) {
+      //   if (node.parent !== undefined) {
+      //     const parent = getBranchNode(tree, node.parent);
+      //     parent.children = parent.children.filter((c) => c !== id);
+      //     tree.structure.delete(id);
+      //     changed = true;
+      //     continue;
+      //   } else {
+      //     // Root
+      //     // Do NOT remove root if it's empty. We need a root.
+      //     // Unless we want to support undefined root? No, ContextTree expects root.
+      //     continue;
+      //   }
+      // }
 
       // 2. Contraction: Flatten nodes with 1 child
       if (node.nodeType === "branch" && node.children.length === 1) {
@@ -522,6 +525,43 @@ export function connectNode(
   }
 }
 
+export function flattenBranchShallow(
+  tree: ContextTree,
+  nodeId: ContextId,
+  preservedIds: Set<ContextId>
+) {
+  const node = getBranchNode(tree, nodeId);
+  let changed = false;
+
+  // We want to flatten children that are NOT in preservedIds and match branchType
+  const newChildren: ContextId[] = [];
+  for (const childId of node.children) {
+    if (preservedIds.has(childId)) {
+      newChildren.push(childId);
+      continue;
+    }
+    const child = getNode(tree, childId);
+    if (child.nodeType === "branch" && child.branchType === node.branchType) {
+      // Flatten!
+      newChildren.push(...child.children);
+      // Update parents of grandchildren
+      for (const grandchildId of child.children) {
+        const gc = getNode(tree, grandchildId);
+        gc.parent = nodeId;
+      }
+      // Remove child
+      tree.structure.delete(childId);
+      changed = true;
+    } else {
+      newChildren.push(childId);
+    }
+  }
+
+  if (changed) {
+    node.children = newChildren;
+  }
+}
+
 export function connectNodes(
   tree: ContextTree,
   ids: ContextId[],
@@ -534,50 +574,34 @@ export function connectNodes(
     return ids[0];
   }
 
+  // 1. Capture types of input nodes BEFORE they are merged/removed by connectNode
+  const inputTypes = ids.map((id) => getLeafNode(tree, id).type);
+  const inputSet = new Set(ids);
+
+  // 2. Connect them sequentially (merging tree logic)
   let currentId = ids[0];
   for (let i = 1; i < ids.length; i++) {
     currentId = connectNode(tree, currentId, ids[i], branchType);
   }
 
-  // Flatten type
-  // currentId is a Leaf with nested type (e.g. [[A, B], C]).
-  // We want [A, B, C].
+  // 3. Flatten the Tree Structure shallowly, preserving inputs (to create N-ary branch for N inputs)
+  // This is only relevant if currentId is a Branch.
+  // If currentId is a Leaf (fully collapsed context), structure is implicit in Type.
   const node = getNode(tree, currentId);
-  if (node.nodeType === "leaf") {
-    node.type = flattenLLType(node.type, branchType);
+  if (node.nodeType === "branch" && node.branchType === branchType) {
+    flattenBranchShallow(tree, currentId, inputSet);
+  } else if (node.nodeType === "leaf") {
+    // 4. If result is a Leaf, its type is currently binary composition (e.g. [[A,B],C]).
+    // We want explicitly the N-ary composition of inputs: [A, B, C].
+    // This respects user's explicit nesting: if user inputs a, {b,c}, inputTypes has A and [B,C].
+    // Result type is [A, [B, C]].
+    if (branchType === "tensor") {
+      node.type = tensorType(inputTypes);
+    } else {
+      node.type = parType(inputTypes);
+    }
   }
 
   normalize(tree);
   return currentId;
-}
-
-function flattenLLType(type: LLType, mode: ContextBranchType): LLType {
-  if (type.type !== mode) return type;
-
-  // Flatten elements
-  const newElements: LLType[] = [];
-  for (const element of type.elements) {
-    if (element.type === mode) {
-      // Recursive flatten? Yes
-      const flatElement = flattenLLType(element, mode);
-      if (flatElement.type === mode) {
-        newElements.push(...flatElement.elements);
-      } else {
-        newElements.push(flatElement);
-      }
-    } else {
-      newElements.push(element);
-    }
-  }
-
-  if (mode === "tensor") return tensorType(newElements);
-  return parType(newElements);
-}
-
-function getAnyLeaf(tree: ContextTree, id: ContextId): ContextId {
-  const node = getNode(tree, id);
-  if (node.nodeType === "leaf") return id;
-  if (node.children.length === 0)
-    throw new ContextTreeError("Empty branch in getAnyLeaf");
-  return getAnyLeaf(tree, node.children[0]);
 }

@@ -66,11 +66,25 @@ export class ContextTreeErrorInvalidBranchType extends ContextTreeError {
   }
 }
 
-export function createContextTree(): ContextTree {
+export function createContextTree(
+  rootType: ContextBranchType = "tensor"
+): ContextTree {
+  const rootId = 0;
   return {
-    structure: new Map(),
-    root: 0,
-    nextId: 0,
+    structure: new Map([
+      [
+        rootId,
+        {
+          nodeType: "branch",
+          id: rootId,
+          parent: undefined,
+          children: [],
+          branchType: rootType,
+        },
+      ],
+    ]),
+    root: rootId,
+    nextId: 1,
   };
 }
 
@@ -269,7 +283,127 @@ export function leastCommonAncestor(
   path2: ContextId[]; // Not including id2, starting from lca
   lca: ContextId;
 } {
-  return {} as any;
+  // const node1 = getNode(tree, id1);
+  // const node2 = getNode(tree, id2);
+
+  const getPathToRoot = (startId: ContextId): ContextId[] => {
+    const path: ContextId[] = [startId];
+    let curr = getNode(tree, startId);
+    while (curr.parent !== undefined) {
+      path.push(curr.parent);
+      curr = getNode(tree, curr.parent);
+    }
+    return path.reverse(); // [root, ..., startId]
+  };
+
+  const rootPath1 = getPathToRoot(id1);
+  const rootPath2 = getPathToRoot(id2);
+
+  let lca: ContextId | undefined;
+  let i = 0;
+  while (
+    i < rootPath1.length &&
+    i < rootPath2.length &&
+    rootPath1[i] === rootPath2[i]
+  ) {
+    lca = rootPath1[i];
+    i++;
+  }
+
+  if (lca === undefined) {
+    throw new ContextTreeError("Nodes are not in the same tree");
+  }
+
+  // rootPath1 is [root, ..., lca, x, y, ..., id1]
+  // we want path1 to be [lca, x, y, ...] (up to but not including id1)
+  // rootPath1 includes id1 at the end.
+  const lcaIndex1 = rootPath1.indexOf(lca);
+  const lcaIndex2 = rootPath2.indexOf(lca);
+
+  const path1 = rootPath1.slice(lcaIndex1, rootPath1.length - 1);
+  const path2 = rootPath2.slice(lcaIndex2, rootPath2.length - 1);
+
+  return { lca, path1, path2 };
+}
+
+export function normalize(tree: ContextTree) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    // Iterate over all nodes. We copy IDs because we might modify the map.
+    for (const id of Array.from(tree.structure.keys())) {
+      if (!tree.structure.has(id)) continue; // Might have been removed
+
+      const node = tree.structure.get(id);
+      if (!node) continue;
+
+      // 1. Contraction: Remove nodes with 0 children
+      if (node.nodeType === "branch" && node.children.length === 0) {
+        if (node.parent !== undefined) {
+          const parent = getBranchNode(tree, node.parent);
+          parent.children = parent.children.filter((c) => c !== id);
+        } else {
+          // Removes root? Allowed if tree is empty?
+          // For now, let's allow removing empty root if it's not the only node?
+          // If root is empty, tree is empty.
+        }
+        tree.structure.delete(id);
+        changed = true;
+        continue;
+      }
+
+      // 2. Contraction: Flatten nodes with 1 child
+      if (node.nodeType === "branch" && node.children.length === 1) {
+        // If it is root, we can only flatten if child is branch?
+        // Or if node is Branch(Leaf), can we replace Branch with Leaf?
+        // If node is root, we update tree.root
+        // If node has parent, we update parent.
+        const childId = node.children[0];
+        const child = getNode(tree, childId);
+
+        if (node.parent !== undefined) {
+          const parent = getBranchNode(tree, node.parent);
+          // Replace node with child in parent's children
+          const index = parent.children.indexOf(id);
+          if (index !== -1) {
+            parent.children[index] = childId;
+          }
+          child.parent = node.parent;
+          tree.structure.delete(id);
+          changed = true;
+          continue;
+        } else {
+          // Node is root
+          tree.root = childId;
+          child.parent = undefined;
+          tree.structure.delete(id);
+          changed = true;
+          continue;
+        }
+      }
+
+      // 3. Alternating Layers: Flatten adjacent same-type nodes
+      if (node.nodeType === "branch" && node.parent !== undefined) {
+        const parent = getBranchNode(tree, node.parent);
+        if (parent.branchType === node.branchType) {
+          // Merge node into parent
+          // parent.children contains [..., node, ...]
+          // we want [..., ...node.children, ...]
+          const index = parent.children.indexOf(id);
+          if (index !== -1) {
+            parent.children.splice(index, 1, ...node.children);
+          }
+          for (const childId of node.children) {
+            const child = getNode(tree, childId);
+            child.parent = parent.id;
+          }
+          tree.structure.delete(id);
+          changed = true;
+          continue;
+        }
+      }
+    }
+  }
 }
 
 export function connectNode(

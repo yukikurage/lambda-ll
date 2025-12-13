@@ -3,8 +3,8 @@ tensor : [x1, ..., xn]
 par: {x1, ..., xn}
 with: (x1 & x2) (between two types, not between n types)
 plus: (x1 | x2)
-one: ()       (unit of tesor)
-bottom: {}    (unit of par)
+one: unit    (unit of tesor)
+bottom: request x by x;    (unit of par)
 top: unknown  (unit of with)
 zero: never   (unit of plus)
 prim type: A, B, C,... P, Q, R, ...
@@ -24,6 +24,13 @@ ex. mp : (((P) => Q, P) => Q)
 ~ {(P => Q)*, P*, Q}
 ~ {{P*, Q}*, P*, Q}
 ~ {(P, Q*), P*, Q}
+
+
+Statements:
+
+intro x, x;
+elim t, t;
+let x = t;
 -#
 
 

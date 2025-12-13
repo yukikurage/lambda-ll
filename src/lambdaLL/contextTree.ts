@@ -437,13 +437,11 @@ export function connectNode(
       }
     });
     // Then, we can remove id1, id2 and add (id1 `par` id2) type to lca
+    const type1 = getLeafNode(tree, id1).type;
+    const type2 = getLeafNode(tree, id2).type;
     removeNode(tree, id1);
     removeNode(tree, id2);
-    const newId = addLeafNode(
-      tree,
-      lca,
-      parType([getLeafNode(tree, id1).type, getLeafNode(tree, id2).type])
-    );
+    const newId = addLeafNode(tree, lca, parType([type1, type2]));
     return newId;
   } else {
     if (lcaNode.branchType !== "tensor") {
@@ -461,13 +459,11 @@ export function connectNode(
     ): ContextId {
       if (remainingPath1.length === 0 && remainingPath2.length === 0) {
         // Delete id1, id2, then add (id1 `tensor` id2) to parent
+        const type1 = getLeafNode(tree, id1).type;
+        const type2 = getLeafNode(tree, id2).type;
         removeNode(tree, id1);
         removeNode(tree, id2);
-        const newId = addLeafNode(
-          tree,
-          parent,
-          tensorType([getLeafNode(tree, id1).type, getLeafNode(tree, id2).type])
-        );
+        const newId = addLeafNode(tree, parent, tensorType([type1, type2]));
         return newId;
       }
       if (remainingPath1.length === 0) {
@@ -512,8 +508,8 @@ export function connectNode(
       node2.children.forEach((child) => {
         moveNode(tree, child, newParentId);
       });
-      removeNode(tree, id1);
-      removeNode(tree, id2);
+      removeNode(tree, remainingPath1[0]);
+      removeNode(tree, remainingPath2[0]);
       return mergeBranch(
         remainingPath1.slice(1),
         remainingPath2.slice(1),
@@ -524,4 +520,64 @@ export function connectNode(
     const remainingPath2 = path2.slice(1);
     return mergeBranch(remainingPath1, remainingPath2, lca);
   }
+}
+
+export function connectNodes(
+  tree: ContextTree,
+  ids: ContextId[],
+  branchType: ContextBranchType
+): ContextId {
+  if (ids.length === 0) {
+    throw new ContextTreeError("Cannot connect 0 nodes");
+  }
+  if (ids.length === 1) {
+    return ids[0];
+  }
+
+  let currentId = ids[0];
+  for (let i = 1; i < ids.length; i++) {
+    currentId = connectNode(tree, currentId, ids[i], branchType);
+  }
+
+  // Flatten type
+  // currentId is a Leaf with nested type (e.g. [[A, B], C]).
+  // We want [A, B, C].
+  const node = getNode(tree, currentId);
+  if (node.nodeType === "leaf") {
+    node.type = flattenLLType(node.type, branchType);
+  }
+
+  normalize(tree);
+  return currentId;
+}
+
+function flattenLLType(type: LLType, mode: ContextBranchType): LLType {
+  if (type.type !== mode) return type;
+
+  // Flatten elements
+  const newElements: LLType[] = [];
+  for (const element of type.elements) {
+    if (element.type === mode) {
+      // Recursive flatten? Yes
+      const flatElement = flattenLLType(element, mode);
+      if (flatElement.type === mode) {
+        newElements.push(...flatElement.elements);
+      } else {
+        newElements.push(flatElement);
+      }
+    } else {
+      newElements.push(element);
+    }
+  }
+
+  if (mode === "tensor") return tensorType(newElements);
+  return parType(newElements);
+}
+
+function getAnyLeaf(tree: ContextTree, id: ContextId): ContextId {
+  const node = getNode(tree, id);
+  if (node.nodeType === "leaf") return id;
+  if (node.children.length === 0)
+    throw new ContextTreeError("Empty branch in getAnyLeaf");
+  return getAnyLeaf(tree, node.children[0]);
 }

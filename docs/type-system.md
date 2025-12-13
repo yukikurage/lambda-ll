@@ -118,7 +118,7 @@ $$
 **transitivity**
 
 $$
-\frac{s_1;\Gamma_1 \vdash x : \tau, \Delta_1 \quad s_2; \Gamma_2, x : \tau \vdash \Delta_2}{s_1 \cup s_2; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
+\frac{s_1;\Gamma_1 \vdash x : \tau, \Delta_1 \quad s_2; \Gamma_2, x : \tau \vdash \Delta_2}{s_1; s_2; \Gamma_1, \Gamma_2 \vdash \Delta_1, \Delta_2}
 $$
 
 ### Syntactic Rules

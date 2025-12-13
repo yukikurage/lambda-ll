@@ -7,11 +7,11 @@
 $$
   \begin{align*}
   t \coloneqq &x | \texttt{(}t\texttt{,}t\texttt{)} | \texttt{left(}t\texttt{)} | \texttt{right(}t\texttt{)}|t\And t|\texttt{$\lbrace$}t\texttt{,}t\texttt{$\rbrace$}\\
-  &|\texttt{()}|\texttt{drop(}t\texttt{)}|\texttt{$\lbrace\rbrace$} \\ 
+  &|\texttt{()}|\texttt{drop(}t\texttt{)}|\texttt{$\lbrace\rbrace$} \\
   &|\texttt{case(}t\texttt{)}\texttt{[left(}x\texttt{)->}t\texttt{,right(}x\texttt{)->}t\texttt{]}
   |t\texttt{.first}|t\texttt{.second}\\
   &|\texttt{abort(}t\texttt{)}\\
-  &|\texttt{$\lbrace$}s;t\texttt{$\rbrace$}
+  &|\texttt{$\lbrace$}s;\texttt{return } t\texttt{$\rbrace$}
   \end{align*}
 $$
 
@@ -19,9 +19,11 @@ $$
 
 $$
   \begin{align*}
-  s^1 \coloneqq & x\ \texttt{=}\ t  \\
-  &|x\ \texttt{<->}\ y | t\ \texttt{>-<}\ t \\
-  &|\texttt{(}x\texttt{,}x\texttt{)}\ \texttt{=}\ t|\texttt{$\lbrace$}x\texttt{,}x\texttt{$\rbrace$}\ \texttt{=}\ t\\
+  s^1 \coloneqq & \texttt{let }x\  \texttt{=}\ t  \\
+  &|\texttt{intro }x\texttt{,}\ x \texttt{:}\ \tau \\
+  &|\texttt{elim } t\texttt{,}\ t \\
+  &|\texttt{let }\texttt{(}x\texttt{,}x\texttt{)}\ \texttt{=}\ t\\
+  &|\texttt{let $\lbrace$}x\texttt{,}x\texttt{$\rbrace$}\ \texttt{=}\ t\\
   &|\texttt{<-}\ t|\texttt{->}\ t
   \end{align*}
 $$

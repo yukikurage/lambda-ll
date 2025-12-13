@@ -5,7 +5,6 @@ import {
   addBranchNode,
   addLeafNode,
   connectNodes,
-  removeNode,
   ContextTree,
 } from "./contextTree";
 import { primitiveType } from "./lltype";
@@ -20,9 +19,6 @@ function printTree(tree: ContextTree) {
 try {
   console.log("Test 1: Intro Normalization");
   const tree = createContextTree("tensor"); // Root 0
-  const parId = addBranchNode(tree, tree.root, "par"); // ID 1
-  const t1 = addLeafNode(tree, parId, primitiveType("A", -1));
-  const t2 = addLeafNode(tree, parId, primitiveType("A", 1));
 
   // Root(0) -> Par(1) -> [A, A]
   normalize(tree);
@@ -65,8 +61,6 @@ try {
 try {
   console.log("\nTest 3: Nested Normalization");
   const tree = createContextTree("tensor"); // 0
-  const branch1 = addBranchNode(tree, tree.root, "tensor"); // 1 (Tensor under Tensor)
-  const leaf = addLeafNode(tree, branch1, primitiveType("A", 1)); // 2
 
   // Root(0) -> Branch(1) -> Leaf(2)
   // All tensor.

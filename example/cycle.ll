@@ -6,7 +6,7 @@ Or use Tensor Strong links to loop.
 [x, y] with x, y connected.
 -#
 
-type Cycle = [P*, P];
+type Cycle = [~P, P];
 
 let bad_cycle : Cycle = {
    intro x, y : P;

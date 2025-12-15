@@ -1,31 +1,31 @@
 #-
-Types: P, Q,..., P*, Q*,... [P,...], {P,...},
+Types: P, Q,..., ~P, ~Q,... [P,...], {P,...},
 
 Inverse: 
-P* = P*
-[P, Q,...]* = {P*, Q*,...}
-{P, Q,...}* = [P*, Q*,...]
+~P = ~P
+~[P, Q,...] = {~P, ~Q,...}
+~{P, Q,...} = [~P, ~Q,...]
 -#
 
 # (A, B) => C is syntax suger for {A*, B*, C}
 # (P => Q, P) => Q 
-#   = {(P => Q)*, P*, Q}
-#   = {{P*, Q}*, P*, Q}
-#   = {[P, Q*], P*, Q} 
+#   = {~(P => Q), ~P, Q}
+#   = {~{~P, Q}, ~P, Q}
+#   = {[P, ~Q], ~P, Q} 
 type MP = (P => Q, P) => Q;
 
 let mp1 : MP = {
-  # introduce variables of types A* and A
-  # arg1: (P => Q)* = {P*, Q}* = [P, Q*]
+  # introduce variables of types ~A and A
+  # arg1: ~(P => Q) = ~{~P, Q} = [P, ~Q]
   intro arg1, pToQ : P => Q; 
-  # arg2: P*, p : P
+  # arg2: ~P, p : P
   intro arg2, p : P;
-  # destruct pToQ : {P*, Q} into pInv : P* and q : Q 
+  # destruct pToQ : {~P, Q} into pInv : ~P and q : Q 
   let {pInv, q} = pToQ;
-  # eliminate terms of types A* and A
-  # here, p : P and pInv : P*
+  # eliminate terms of types ~A and A
+  # here, p : P and pInv : ~P
   elim p, pInv;
-  # return {arg1, arg2, q} : {[P, Q*], P*, Q} = MP
+  # return {arg1, arg2, q} : {[P, ~Q], ~P, Q} = MP
   return {arg1, arg2, q};
 };
 
@@ -48,7 +48,7 @@ let inner : Inner = (pqr : [P, {Q, R}]) => {
   return {q, [p, r]};
 };
 
-let excludedMiddle : {P, P*} = {
+let excludedMiddle : {P, ~P} = {
   intro pInv, p : P;
   return {p, pInv};
 };

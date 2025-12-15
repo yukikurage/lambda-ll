@@ -60,9 +60,9 @@ parseType = try functionType <|> baseType
     ret <- parseType
     return (TFun args ret)
 
-  baseType = do
-    t <- atom
-    suffixes t
+  baseType =
+    (symbol "~" >> TDual <$> baseType)
+      <|> atom
 
   atom =
     choice
@@ -71,8 +71,6 @@ parseType = try functionType <|> baseType
       , TAtom <$> identifier
       , parens parseType
       ]
-
-  suffixes t = (symbol "*" >> suffixes (TDual t)) <|> return t
 
 -- Terms
 

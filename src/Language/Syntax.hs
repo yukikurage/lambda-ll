@@ -9,7 +9,7 @@ module Language.Syntax
   )
 where
 
-import Data.List
+import Data.List (intercalate)
 
 type Name = String
 
@@ -25,8 +25,8 @@ printType :: Type -> String
 printType t = case t of
   TAtom n -> n
   TDual t' -> "~" ++ printType t'
-  TTensor ts -> "{" ++ intercalate ", " (map printType ts) ++ "}"
-  TPar ts -> "[" ++ intercalate ", " (map printType ts) ++ "]"
+  TTensor ts -> "[" ++ intercalate ", " (map printType ts) ++ "]"
+  TPar ts -> "{" ++ intercalate ", " (map printType ts) ++ "}"
   TFun args ret -> "(" ++ intercalate ", " (map printType args) ++ ") => " ++ printType ret
 
 data Term

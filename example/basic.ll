@@ -47,3 +47,8 @@ let inner : Inner = (pqr : [P, {Q, R}]) => {
   let {q, r} = qr;
   return {q, [p, r]};
 };
+
+let excludedMiddle : {P, P*} = {
+  intro pInv, p : P;
+  return {p, pInv};
+};

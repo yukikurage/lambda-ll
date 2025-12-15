@@ -28,6 +28,9 @@ library
       Graph.Contractibility
       Graph.Types
       Graph.UnionFind
+      Language.Parser
+      Language.Syntax
+      Language.TypeCheck
       Lib
   other-modules:
       Paths_lambda_ll
@@ -39,6 +42,9 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , megaparsec
+    , mtl
+    , text
   default-language: Haskell2010
 
 executable lambda-ll-exe
@@ -54,6 +60,9 @@ executable lambda-ll-exe
       base >=4.7 && <5
     , containers
     , lambda-ll
+    , megaparsec
+    , mtl
+    , text
   default-language: Haskell2010
 
 test-suite lambda-ll-test
@@ -70,4 +79,7 @@ test-suite lambda-ll-test
       base >=4.7 && <5
     , containers
     , lambda-ll
+    , megaparsec
+    , mtl
+    , text
   default-language: Haskell2010

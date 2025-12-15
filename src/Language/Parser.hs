@@ -79,16 +79,10 @@ term = try lambda <|> appOrAtom
  where
   lambda = do
     -- (x:T, y:U) => Body
-    params <- try (parens (argDecl `sepBy` comma)) <|> ((: []) <$> argDecl)
+    params <- parens (parseTypedPattern `sepBy` comma)
     _ <- symbol "=>"
     body <- term
     return (Lambda params body)
-   where
-    argDecl = do
-      n <- identifier
-      _ <- symbol ":"
-      t <- parseType
-      return (n, t)
 
   appOrAtom = do
     t <- atom
@@ -114,38 +108,39 @@ parseBraceContent = try parseBlock <|> parsePar
     _ <- optional semi
     return (Block ss t)
 
--- Statements
+parsePattern :: Parser Pattern
+parsePattern =
+  choice
+    [ PVar <$> identifier
+    , PTensor <$> brackets (parsePattern `sepBy` comma)
+    , PPar <$> braces (parsePattern `sepBy` comma)
+    , parens parsePattern
+    ]
 
+parseTypedPattern :: Parser TypedPattern
+parseTypedPattern =
+  choice
+    [ TPVar <$> identifier <* symbol ":" <*> parseType
+    , TPTensor <$> brackets (parseTypedPattern `sepBy` comma)
+    , TPPar <$> braces (parseTypedPattern `sepBy` comma)
+    , parens parseTypedPattern
+    ]
+
+-- Statements
 stmt :: Parser Stmt
 stmt =
   choice
-    [ try parseLetTensor
-    , try parseLetPar
-    , try parseLet
+    [ try parseLet
     , try parseIntro
     , parseElim
     ]
  where
   parseLet = do
     _ <- symbol "let"
-    n <- identifier
+    pt <- parsePattern
     _ <- symbol "="
     t <- term
-    return (Let n t)
-
-  parseLetTensor = do
-    _ <- symbol "let"
-    ns <- brackets (identifier `sepBy` comma)
-    _ <- symbol "="
-    t <- term
-    return (LetTensor ns t)
-
-  parseLetPar = do
-    _ <- symbol "let"
-    ns <- braces (identifier `sepBy` comma)
-    _ <- symbol "="
-    t <- term
-    return (LetPar ns t)
+    return (Let pt t)
 
   parseIntro = do
     _ <- symbol "intro"

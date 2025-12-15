@@ -199,13 +199,9 @@ checkTerm tm = case tm of
   Lambda params body -> do
     preVars <- gets availableVars
     -- introduce params
-    xtns :: [(Name, Type, G.Node)] <-
+    xtns :: [(Type, G.Node)] <-
       mapM
-        ( \(x, t) -> do
-            expandedT <- expandType t
-            n <- introduce x expandedT
-            return (x, expandedT, n)
-        )
+        (\p -> checkTypedPattern p)
         params
     -- check body
     (bodyTy, bodyNode) <- checkTerm body
@@ -217,8 +213,8 @@ checkTerm tm = case tm of
         "Linearity Error: Local variables defined in lambda not consumed: " ++ show (M.toList unconsumedLocals)
     node <- registerFreshNode
     -- Weak link: Args & Ret -> Node
-    linkWeak node $ map (\(_, _, n) -> n) xtns ++ [bodyNode]
-    return (TFun (map snd params) bodyTy, node)
+    linkWeak node $ map snd xtns ++ [bodyNode]
+    return (TFun (map fst xtns) bodyTy, node)
   App f args -> do
     (fTy, fNode) <- checkTerm f
     -- fTy を desuger すると Par [...~args, ret] でなければいけない。
@@ -238,36 +234,12 @@ checkTerm tm = case tm of
 
 checkStmt :: Stmt -> CheckM ()
 checkStmt stmt = case stmt of
-  Let x tm -> do
+  Let pt tm -> do
     (inferedT, node) <- checkTerm tm
-    xNode <- introduce x inferedT
-    linkStrong [xNode, node]
-  LetTensor xs tm -> do
-    (inferedT, node) <- checkTerm tm
-    let
-      -- Desugered inferedT should be Tensor [t,...]
-      desugaredInferedT = desugarType inferedT
-    case desugaredInferedT of
-      TTensor ts -> do
-        unless (length xs == length ts) $ throwError "LetTensor Error: Number of variables does not match"
-        -- Weak link
-        nodes <- zipWithM introduce xs ts
-        linkWeak node nodes
-      _ -> throwError "LetTensor Error: Not a tensor"
-  LetPar xs tm -> do
-    (inferedT, node) <- checkTerm tm
-    let
-      -- Desugered inferedT should be Par [t,...]
-      desugaredInferedT = desugarType inferedT
-    case desugaredInferedT of
-      TPar ts -> do
-        unless (length xs == length ts) $ throwError "LetPar Error: Number of variables does not match"
-        -- Strong Link
-        nodes <- zipWithM introduce xs ts
-        linkStrong $ node : nodes
-      _ -> throwError "LetPar Error: Not a par"
-  Intro x y t -> do
-    expandedT <- expandType t
+    patternNode <- checkPattern pt inferedT
+    linkStrong [patternNode, node]
+  Intro x y ty -> do
+    expandedT <- expandType ty
     xNode <- introduce x $ TDual expandedT
     yNode <- introduce y expandedT
     linkStrong [xNode, yNode]
@@ -280,3 +252,56 @@ checkStmt stmt = case stmt of
       desugeredT2 = desugarType inferedT2
     unless (eqTy desugeredDualT1 desugeredT2) $ throwError "Elim Error: Duals do not match"
     linkStrong [node1, node2]
+
+checkTypedPattern :: TypedPattern -> CheckM (Type, G.Node)
+checkTypedPattern tyPattern = case tyPattern of
+  TPVar x ty -> do
+    expandedTy <- expandType ty
+    xNode <- introduce x expandedTy
+    return (expandedTy, xNode)
+  TPTensor ps -> do
+    tns <- mapM (\p -> checkTypedPattern p) ps
+    let
+      ty = TTensor $ map fst tns
+    node <- registerFreshNode
+    linkWeak node $ map snd tns
+    return (ty, node)
+  TPPar ps -> do
+    tns <- mapM (\p -> checkTypedPattern p) ps
+    let
+      ty = TPar $ map fst tns
+    node <- registerFreshNode
+    linkStrong $ node : map snd tns
+    return (ty, node)
+
+checkPattern :: Pattern -> Type -> CheckM G.Node
+checkPattern pattern ty = case pattern of
+  PVar x -> do
+    xNode <- introduce x ty
+    return xNode
+  PTensor ps -> do
+    let
+      -- desugered ty should be Tensor [t,...]
+      desugeredTy = desugarType ty
+    case desugeredTy of
+      TTensor ts -> do
+        node <- registerFreshNode
+        unless (length ps == length ts) $ throwError "LetTensor Error: Number of variables does not match"
+        -- Weak link
+        nodes <- zipWithM (\p nestedTy -> checkPattern p nestedTy) ps ts
+        linkWeak node nodes
+        return node
+      _ -> throwError "Pattern Error: Not a tensor"
+  PPar ps -> do
+    let
+      -- desugered ty should be Par [t,...]
+      desugeredTy = desugarType ty
+    case desugeredTy of
+      TPar ts -> do
+        unless (length ps == length ts) $ throwError "LetPar Error: Number of variables does not match"
+        -- Strong Link
+        nodes <- zipWithM (\p nestedTy -> checkPattern p nestedTy) ps ts
+        node <- registerFreshNode
+        linkStrong $ node : nodes
+        return node
+      _ -> throwError "Pattern Error: Not a par"

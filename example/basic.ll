@@ -42,13 +42,17 @@ let mp2 : MP = (f : P => Q, x : P) => f(x);
 
 type Inner = [P, {Q, R}] => {Q, [P, R]};
 
-let inner : Inner = (pqr : [P, {Q, R}]) => {
-  let [p, qr] = pqr;
-  let {q, r} = qr;
-  return {q, [p, r]};
-};
+let inner : Inner = ([p : P, {q : Q, r : R}]) => {q, [p, r]};
 
-let excludedMiddle : {P, ~P} = {
+let excludedMiddle : {P, ~P} = {intro pInv, p : P; return {p, pInv}};
+
+let excludedMiddle' : {P, P => {}} = {
   intro pInv, p : P;
-  return {p, pInv};
+  return {
+    p, 
+    (argP : P) => {
+      elim argP, pInv; 
+      return {};
+    }
+  };
 };

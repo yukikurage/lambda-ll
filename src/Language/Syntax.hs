@@ -5,6 +5,8 @@ module Language.Syntax
   , Stmt (..)
   , Program (..)
   , TopLevel (..)
+  , Pattern (..)
+  , TypedPattern (..)
   , printType
   )
 where
@@ -29,19 +31,29 @@ printType t = case t of
   TPar ts -> "{" ++ intercalate ", " (map printType ts) ++ "}"
   TFun args ret -> "(" ++ intercalate ", " (map printType args) ++ ") => " ++ printType ret
 
+data Pattern
+  = PVar Name
+  | PTensor [Pattern]
+  | PPar [Pattern]
+  deriving (Show, Eq)
+
+data TypedPattern
+  = TPVar Name Type
+  | TPTensor [TypedPattern]
+  | TPPar [TypedPattern]
+  deriving (Show, Eq)
+
 data Term
   = Var Name
   | Tensor [Term]
   | Par [Term]
   | Block [Stmt] Term
-  | Lambda [(Name, Type)] Term -- Sugar: (x:T) => t
+  | Lambda [TypedPattern] Term -- Sugar: (x:T) => t
   | App Term [Term] -- Sugar: f(t, u)
   deriving (Show, Eq)
 
 data Stmt
-  = Let Name Term
-  | LetTensor [Name] Term
-  | LetPar [Name] Term
+  = Let Pattern Term
   | Intro Name Name Type -- intro arg1, pToQ : P => Q
   | Elim Term Term -- elim p, pInv
   deriving (Show, Eq)

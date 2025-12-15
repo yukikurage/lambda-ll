@@ -7,10 +7,10 @@ Lambda-LL is a linear logic programming language validated using the Danos-Regni
 ### Types
 
 - **Atoms**: `P`, `Q`, `Msg`, etc.
-- **Dual**: `T*` (e.g. `P*`). Note: `(P*)* = P`.
+- **Dual**: `~T` (e.g. `~P`). Note: `~(~P) = P`.
 - **Tensor**: `[A, B]` (Multiplicative Conjunction). Strong connection.
 - **Par**: `{A, B}` (Multiplicative Disjunction). Weak connection.
-- **Implication**: `A => B` (Sugar for `{A*, B}`).
+- **Implication**: `A => B` (Sugar for `{~A, B}`).
 
 ### Terms
 
@@ -25,7 +25,7 @@ Lambda-LL is a linear logic programming language validated using the Danos-Regni
 ### Statements
 
 - **Intro**: `intro x, y : T;`
-  - Creates two variables `x` (:T) and `y` (:T\*) connected by an Axiom link.
+  - Creates two variables `x` (:~T) and `y` (:T) connected by an Axiom link.
 - **Elim**: `elim x, y;`
   - Consumes `x` and `y` by connecting them with a Cut link.
   - `x` and `y` must have compatible types (duals).

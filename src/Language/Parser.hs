@@ -108,21 +108,43 @@ parseBraceContent = try parseBlock <|> parsePar
     _ <- optional semi
     return (Block ss t)
 
+parseBracePattern :: Parser Pattern
+parseBracePattern = try parseBlock <|> parsePar
+ where
+  parsePar = PPar <$> (parsePattern `sepBy` comma)
+  parseBlock = do
+    _ <- symbol "require"
+    pt <- parsePattern
+    _ <- semi
+    ss <- many (try (stmt <* semi))
+    return (PBlock pt ss)
+
 parsePattern :: Parser Pattern
 parsePattern =
   choice
     [ PVar <$> identifier
     , PTensor <$> brackets (parsePattern `sepBy` comma)
-    , PPar <$> braces (parsePattern `sepBy` comma)
+    , braces parseBracePattern
     , parens parsePattern
     ]
+
+parseBraceTypedPattern :: Parser TypedPattern
+parseBraceTypedPattern = try parseBlock <|> parsePar
+ where
+  parsePar = TPPar <$> (parseTypedPattern `sepBy` comma)
+  parseBlock = do
+    _ <- symbol "require"
+    pt <- parseTypedPattern
+    _ <- semi
+    ss <- many (try (stmt <* semi))
+    return (TPBlock pt ss)
 
 parseTypedPattern :: Parser TypedPattern
 parseTypedPattern =
   choice
     [ TPVar <$> identifier <* symbol ":" <*> parseType
     , TPTensor <$> brackets (parseTypedPattern `sepBy` comma)
-    , TPPar <$> braces (parseTypedPattern `sepBy` comma)
+    , braces parseBraceTypedPattern
     , parens parseTypedPattern
     ]
 

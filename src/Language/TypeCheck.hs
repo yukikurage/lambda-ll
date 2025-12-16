@@ -273,6 +273,17 @@ checkTypedPattern tyPattern = case tyPattern of
     node <- registerFreshNode
     linkStrong $ node : map snd tns
     return (ty, node)
+  TPBlock pt stmts -> do
+    preVars <- gets availableVars
+    (patTy, patNode) <- checkTypedPattern pt
+    mapM_ checkStmt stmts
+    postVars <- gets availableVars
+    let
+      useNoLocals = M.difference preVars postVars
+    unless (M.null useNoLocals) $
+      throwError $
+        "Linearity Error: Local variables defined in outer block is consumed: " ++ show (M.toList useNoLocals)
+    return (patTy, patNode)
 
 checkPattern :: Pattern -> Type -> CheckM G.Node
 checkPattern pattern ty = case pattern of
@@ -305,3 +316,14 @@ checkPattern pattern ty = case pattern of
         linkStrong $ node : nodes
         return node
       _ -> throwError "Pattern Error: Not a par"
+  PBlock pat stmts -> do
+    preVars <- gets availableVars
+    patNode <- checkPattern pat ty
+    mapM_ checkStmt stmts
+    postVars <- gets availableVars
+    let
+      useNoLocals = M.difference preVars postVars
+    unless (M.null useNoLocals) $
+      throwError $
+        "Linearity Error: Local variables defined in outer block is consumed: " ++ show (M.toList useNoLocals)
+    return patNode

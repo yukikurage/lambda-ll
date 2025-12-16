@@ -35,12 +35,14 @@ data Pattern
   = PVar Name
   | PTensor [Pattern]
   | PPar [Pattern]
+  | PBlock Pattern [Stmt]
   deriving (Show, Eq)
 
 data TypedPattern
   = TPVar Name Type
   | TPTensor [TypedPattern]
   | TPPar [TypedPattern]
+  | TPBlock TypedPattern [Stmt]
   deriving (Show, Eq)
 
 data Term
@@ -50,6 +52,12 @@ data Term
   | Block [Stmt] Term
   | Lambda [TypedPattern] Term -- Sugar: (x:T) => t
   | App Term [Term] -- Sugar: f(t, u)
+  deriving (Show, Eq)
+
+data TypedStmt
+  = TLet TypedPattern Term
+  | TIntro Name Name Type -- intro arg1, pToQ : P => Q
+  | TElim Term Term -- elim p, pInv
   deriving (Show, Eq)
 
 data Stmt

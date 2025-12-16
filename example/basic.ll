@@ -56,3 +56,16 @@ let excludedMiddle' : {P, P => {}} = {
     }
   };
 };
+
+# block pattern destructing
+let blockPat = (p : P, q : Q) => {
+  let 
+    { 
+      require [x, y];
+      intro a, b : P;
+      elim x, a;
+    } = [p, q];
+  return [b, y];
+};
+
+let blockPatLambda = ({require x : P; let y = (f : P => Q) => f(x);}) => y;
